@@ -1,0 +1,6 @@
+# Flow-State Sample DAG — diamond dependency pattern
+# Task 4 cannot run until both Task 2 and Task 3 complete
+TASK id=1 cmd="jobs/dummy.sh 1" deps=none retries=1
+TASK id=2 cmd="jobs/dummy.sh 2" deps=1 retries=1
+TASK id=3 cmd="jobs/dummy.sh 3" deps=1 retries=1
+TASK id=4 cmd="jobs/dummy.sh 4" deps=2,3 retries=2

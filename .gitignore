@@ -1,0 +1,18 @@
+# Compiled binaries
+master
+worker
+test_dag
+test_protocol
+test_executor
+test_ipc
+
+# Object and dependency files
+**/*.o
+**/*.d
+
+# Log output
+logs/
+
+# Editor artifacts
+*.swp
+.vscode/
