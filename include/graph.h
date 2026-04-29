@@ -70,6 +70,10 @@ void dag_enqueue_ready(DAGGraph *graph, DAGNode *node);
 
 DAGNode *dag_dequeue_ready(DAGGraph *graph);
 
+DAGNode *dag_find_node(DAGGraph *graph, int task_id);
+
+int dag_is_complete(DAGGraph *graph);
+
 int task_transition(DAGNode *node, TaskState expected, TaskState next);
 
 void dag_notify_children(DAGGraph *graph, DAGNode *completed_node);

@@ -5,7 +5,7 @@
 
 #include "graph.h"
 
-static DAGNode *find_node(DAGGraph *graph, int task_id)
+DAGNode *dag_find_node(DAGGraph *graph, int task_id)
 {
     for(int i=0; i<graph->num_nodes; i++)
     {
@@ -15,6 +15,16 @@ static DAGNode *find_node(DAGGraph *graph, int task_id)
         }
     }
     return NULL;
+}
+
+int dag_is_complete(DAGGraph *graph)
+{
+    for(int i = 0; i < graph->num_nodes; i++) 
+    {
+        TaskState s = graph->nodes[i].state;
+        if(s != COMPLETED && s != DEAD && s != CASCADE_FAILED) return 0;
+    }
+    return 1;
 }
 
 static int extract_quoted(const char *src, char *dest, size_t dest_size)
@@ -157,7 +167,7 @@ int dag_build_edges(DAGGraph *graph)
         for(int d = 0; d < child->num_deps; d++) 
         {
             int dep_id = child->dep_ids[d];
-            DAGNode *parent = find_node(graph, dep_id);
+            DAGNode *parent = dag_find_node(graph, dep_id);
             if(!parent) 
             {
                 fprintf(stderr, "[dag_build_edges] Task %d depends on unknown task id=%d\n", child->task_id, dep_id);
