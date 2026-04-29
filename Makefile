@@ -33,7 +33,7 @@ test_protocol: tests/test_protocol.c src/common/protocol.c
 test_executor: tests/test_executor.c src/worker/executor.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o test_executor $^
 
-test_ipc: tests/test_ipc.c src/common/ipc_sync.c
+test_ipc: tests/test_ipc.c src/common/ipc_sync.c src/common/logger.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o test_ipc $^
 
 tests: test_dag test_protocol test_executor test_ipc
