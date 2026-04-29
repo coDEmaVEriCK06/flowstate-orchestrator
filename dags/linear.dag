@@ -1,0 +1,8 @@
+# Flow-State Linear Chain DAG
+# Tasks execute in strict sequence: 1 → 2 → 3 → 4
+# No task begins until its single predecessor completes.
+# Demonstrates dependency enforcement for pipeline-style workflows.
+TASK id=1 cmd="jobs/dummy.sh 1" deps=none retries=1
+TASK id=2 cmd="jobs/dummy.sh 2" deps=1    retries=1
+TASK id=3 cmd="jobs/dummy.sh 3" deps=2    retries=1
+TASK id=4 cmd="jobs/dummy.sh 4" deps=3    retries=2
