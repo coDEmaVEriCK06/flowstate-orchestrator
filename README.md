@@ -58,7 +58,8 @@ Every task transitions through a strict state machine enforced by a single
 PENDING → READY → DISPATCHED → RUNNING → COMPLETED (terminal)
                                        ↘ FAILED → READY (retry)
                                                  → DEAD (terminal)
-                                                     → CASCADE_FAILED (descendants)
+                                                     → CASCADE_FAILED 
+(descendants)
 ```
 
 ---
