@@ -1,0 +1,2 @@
+# Stress test: output exceeding MAX_OUTPUT_LEN
+TASK id=1 cmd="jobs/bigoutput.sh" deps=none retries=0

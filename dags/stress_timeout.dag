@@ -1,0 +1,2 @@
+# Stress test: timeout enforcement
+TASK id=1 cmd="jobs/infinite.sh" deps=none retries=0
