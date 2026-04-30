@@ -1,6 +1,7 @@
 # Compiled binaries
 master
 worker
+observer
 test_dag
 test_protocol
 test_executor

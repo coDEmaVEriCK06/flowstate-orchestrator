@@ -11,6 +11,8 @@
 #define DISPATCH_PAYLOAD_SIZE     (4 + 4 + 256)         /* 264 bytes */
 #define ACK_PAYLOAD_SIZE          (4 + 4)               /* 8   bytes */
 #define RESULT_PAYLOAD_SIZE       (4 + 4 + 4 + 4 + MAX_OUTPUT_LEN) /* 4112 bytes */
+#define STATUS_RESPONSE_PAYLOAD_SIZE \
+(4 + MAX_STATUS_ENTRIES * 12)   /* 4 + 64*12 = 772 bytes */
 
 /* Return values for proto_try_deframe() */
 #define DEFRAME_COMPLETE   1   /* a full message was extracted    */
@@ -25,6 +27,8 @@ typedef enum
     MSG_DISPATCH    = 0x03,  /* master to worker: task payload            */
     MSG_ACK         = 0x04,  /* worker to master: task receipt confirmed  */
     MSG_RESULT      = 0x05,  /* worker to master: task output + exit code */
+    MSG_STATUS_REQUEST  = 0x06,  /* observer → master: request DAG state    */
+    MSG_STATUS_RESPONSE = 0x07,  /* master → observer: current task states  */
 } MessageType;
 
 // Role-based authorization
@@ -71,6 +75,36 @@ typedef struct //Total size 4+4+4+4+4096 = 4112 bytes
     char output[MAX_OUTPUT_LEN]; /* captured stdout + stderr */
 } ResultPayload;
 
+/*
+ * MSG_STATUS_REQUEST payload (0 bytes)
+ * Observer sends this with no payload — just the 8-byte header.
+ * The master responds with MSG_STATUS_RESPONSE.
+ */
+
+/*
+ * TaskStatusEntry — state of one task, packed into MSG_STATUS_RESPONSE.
+ * Fixed size: 4 + 4 + 4 = 12 bytes per task.
+ */
+typedef struct 
+{
+    uint32_t task_id;
+    uint32_t state;      /* TaskState enum value cast to uint32_t */
+    int32_t  exit_code;  /* last known exit code, 0 if not yet run */
+} TaskStatusEntry;
+
+/*
+ * MSG_STATUS_RESPONSE payload
+ * Master sends one entry per task in the DAG.
+ * num_tasks tells the observer how many entries follow.
+ */
+#define MAX_STATUS_ENTRIES  64   /* matches MAX_TASKS in graph.h */
+
+typedef struct 
+{
+    uint32_t        num_tasks;
+    TaskStatusEntry entries[MAX_STATUS_ENTRIES];
+} StatusResponsePayload;
+
 typedef struct // Per-connection receive buffer
 {
     uint8_t data[RECV_BUF_SIZE]; /* raw byte accumulator */
@@ -102,5 +136,11 @@ int proto_parse_dispatch(const uint8_t *payload, uint32_t payload_len, uint32_t 
 int proto_parse_ack(const uint8_t *payload, uint32_t payload_len, uint32_t *task_id, uint32_t *generation);
 
 int proto_parse_result(const uint8_t *payload, uint32_t payload_len, uint32_t *task_id, uint32_t *generation, int32_t *exit_code, char *output, uint32_t *output_len);
+
+int proto_pack_status_request(uint8_t *buf, size_t buf_size);
+
+int proto_pack_status_response(uint8_t *buf, size_t buf_size, const TaskStatusEntry *entries, uint32_t num_tasks);
+
+int proto_parse_status_response(const uint8_t *payload, uint32_t payload_len, TaskStatusEntry *entries, uint32_t *num_tasks);
 
 #endif

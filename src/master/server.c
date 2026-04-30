@@ -25,6 +25,9 @@ static void process_msg_ack(MasterState *ms, WorkerConn *w,
 static void process_msg_result(MasterState *ms, WorkerConn *w,
                                const uint8_t *payload, uint32_t len);
 static WorkerConn *find_worker_by_fd(MasterState *ms, int fd);
+static void process_msg_status_request(MasterState *ms, WorkerConn *w,
+                                       const uint8_t *payload,
+                                       uint32_t len);
 
 int server_setup_listen_socket(int port) 
 {
@@ -281,6 +284,9 @@ static void handle_worker_data(MasterState *ms, WorkerConn *w)
             case MSG_RESULT:
                 process_msg_result(ms, w, payload, payload_len);
                 break;
+            case MSG_STATUS_REQUEST:
+                process_msg_status_request(ms, w, payload, payload_len);
+                break;
             default:
                 fprintf(stderr, "[server] Unknown message type 0x%02x from fd=%d\n", msg_type, w->socket_fd);
                 break;
@@ -506,4 +512,48 @@ static WorkerConn *find_worker_by_fd(MasterState *ms, int fd)
     }
     pthread_mutex_unlock(&ms->registry.lock);
     return NULL;
+}
+
+/* ============================================================
+ * process_msg_status_request — observer queries DAG state
+ *
+ * Reads current state of all tasks (no lock needed for state
+ * reads since TaskState is a single int — atomic on all
+ * modern architectures for read-only access).
+ * Packs a MSG_STATUS_RESPONSE and sends it back.
+ * ============================================================ */
+static void process_msg_status_request(MasterState *ms, WorkerConn *w,
+                                       const uint8_t *payload,
+                                       uint32_t len) {
+    (void)payload;
+    (void)len;
+
+    /* Build the entries array from the current DAG state */
+    TaskStatusEntry entries[MAX_STATUS_ENTRIES];
+    uint32_t num_tasks = (uint32_t)ms->graph.num_nodes;
+
+    for(uint32_t i = 0; i < num_tasks; i++) {
+        DAGNode *node = &ms->graph.nodes[i];
+        entries[i].task_id   = (uint32_t)node->task_id;
+        entries[i].state     = (uint32_t)node->state;
+        entries[i].exit_code = 0; /* exit code not stored in DAGNode */
+    }
+
+    /* Pack and send the response */
+    uint8_t buf[RECV_BUF_SIZE];
+    int n = proto_pack_status_response(buf, sizeof(buf),
+                                       entries, num_tasks);
+    if(n < 0) {
+        fprintf(stderr,
+            "[server] Failed to pack status response for fd=%d\n",
+            w->socket_fd);
+        return;
+    }
+
+    pthread_mutex_lock(&w->write_lock);
+    write(w->socket_fd, buf, n);
+    pthread_mutex_unlock(&w->write_lock);
+
+    printf("[server] Sent status response to observer fd=%d "
+           "(%u tasks)\n", w->socket_fd, num_tasks);
 }

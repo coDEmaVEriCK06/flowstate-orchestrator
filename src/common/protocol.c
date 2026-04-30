@@ -65,7 +65,7 @@ int proto_try_deframe(ConnRecvBuffer *rbuf, uint32_t *out_type, uint8_t  *out_pa
     }
 
     /* Validate message type is one we recognize */
-    if(msg_type < MSG_CONNECT || msg_type > MSG_RESULT) 
+    if(msg_type < MSG_CONNECT || msg_type > MSG_STATUS_RESPONSE) 
     {
         fprintf(stderr, "[proto_try_deframe] Unknown message type: 0x%02x\n", msg_type);
         return DEFRAME_ERROR;
@@ -289,5 +289,84 @@ int proto_parse_result(const uint8_t *payload, uint32_t payload_len, uint32_t *t
     memcpy(output, payload + offset, *output_len);
     /* Null-terminate so callers can safely use output as a string */
     output[*output_len] = '\0';
+    return 0;
+}
+
+/* ============================================================
+ * proto_pack_status_request
+ * Observer sends this with zero payload — just an 8-byte header.
+ * ============================================================ */
+int proto_pack_status_request(uint8_t *buf, size_t buf_size) {
+    uint32_t total = WIRE_HEADER_SIZE; /* payload_len = 0 */
+    if (buf_size < total) return -1;
+    write_header(buf, MSG_STATUS_REQUEST, 0);
+    return (int)total;
+}
+
+/* ============================================================
+ * proto_pack_status_response
+ * Master packs current state of all tasks into one message.
+ * ============================================================ */
+int proto_pack_status_response(uint8_t *buf, size_t buf_size,
+                               const TaskStatusEntry *entries,
+                               uint32_t num_tasks) {
+    uint32_t payload_len = STATUS_RESPONSE_PAYLOAD_SIZE;
+    uint32_t total       = WIRE_HEADER_SIZE + payload_len;
+    if(buf_size < total) return -1;
+
+    write_header(buf, MSG_STATUS_RESPONSE, payload_len);
+
+    size_t offset = WIRE_HEADER_SIZE;
+
+    /* Pack num_tasks */
+    uint32_t net_num = htonl(num_tasks);
+    memcpy(buf + offset, &net_num, 4);
+    offset += 4;
+
+    /* Pack each entry — zero-fill the entire entries region first */
+    memset(buf + offset, 0, MAX_STATUS_ENTRIES * 12);
+    for(uint32_t i = 0; i < num_tasks && i < MAX_STATUS_ENTRIES; i++) {
+        uint32_t net_id    = htonl(entries[i].task_id);
+        uint32_t net_state = htonl(entries[i].state);
+        uint32_t net_exit  = htonl((uint32_t)entries[i].exit_code);
+        memcpy(buf + offset,     &net_id,    4);
+        memcpy(buf + offset + 4, &net_state, 4);
+        memcpy(buf + offset + 8, &net_exit,  4);
+        offset += 12;
+    }
+
+    return (int)total;
+}
+
+/* ============================================================
+ * proto_parse_status_response
+ * Observer unpacks the response from the master.
+ * ============================================================ */
+int proto_parse_status_response(const uint8_t *payload,
+                                uint32_t payload_len,
+                                TaskStatusEntry *entries,
+                                uint32_t *num_tasks) {
+    if(payload_len != STATUS_RESPONSE_PAYLOAD_SIZE) return -1;
+
+    size_t offset = 0;
+
+    uint32_t net_num;
+    memcpy(&net_num, payload + offset, 4);
+    *num_tasks = ntohl(net_num);
+    offset += 4;
+
+    if(*num_tasks > MAX_STATUS_ENTRIES)
+        *num_tasks = MAX_STATUS_ENTRIES;
+
+    for(uint32_t i = 0; i < *num_tasks; i++) {
+        uint32_t net_id, net_state, net_exit;
+        memcpy(&net_id,    payload + offset,     4);
+        memcpy(&net_state, payload + offset + 4, 4);
+        memcpy(&net_exit,  payload + offset + 8, 4);
+        entries[i].task_id   = ntohl(net_id);
+        entries[i].state     = ntohl(net_state);
+        entries[i].exit_code = (int32_t)ntohl(net_exit);
+        offset += 12;
+    }
     return 0;
 }
