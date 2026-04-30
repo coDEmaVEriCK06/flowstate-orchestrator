@@ -303,7 +303,6 @@ void client_run(const char *host, int port, const char *auth_token)
             continue;
         }
         printf("[client] TCP connection established (fd=%d)\n", fd);
-        reconnect_delay = RECONNECT_INIT_SEC;  /* reset backoff on success */
 
         /* Initialize the receive buffer for this connection */
         ConnRecvBuffer rbuf;
@@ -318,6 +317,7 @@ void client_run(const char *host, int port, const char *auth_token)
             reconnect_delay = (reconnect_delay * 2 > RECONNECT_MAX_SEC) ? RECONNECT_MAX_SEC : reconnect_delay * 2;
             continue;
         }
+        reconnect_delay = RECONNECT_INIT_SEC;  /* reset backoff on success */
 
         /* Enter the main dispatch loop */
         int ret = run_worker_loop(fd, &rbuf);
