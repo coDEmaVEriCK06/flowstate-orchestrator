@@ -1,5 +1,3 @@
-
-```markdown
 # Flow-State Orchestrator
 
 A distributed DAG (Directed Acyclic Graph) task scheduler and orchestrator built
